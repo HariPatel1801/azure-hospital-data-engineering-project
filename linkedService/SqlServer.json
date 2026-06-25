@@ -1,0 +1,21 @@
+{
+    "name": "SqlServer",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "annotations": [],
+        "type": "SqlServer",
+        "typeProperties": {
+            "server": "localhost\\MSSQLSERVER01",
+            "database": "GeneralHospitalDB",
+            "encrypt": "optional",
+            "trustServerCertificate": true,
+            "authenticationType": "SQL",
+            "userName": "adf_user",
+            "encryptedCredential": "eyJDcmVkZW50aWFsSWQiOiI4NDczMzkwMy1hYmNhLTQ0NmEtYTY5Ny1iNzBlMjEwMDc4ZTIiLCJWZXJzaW9uIjoiMi4wIiwiQ2xhc3NUeXBlIjoiTWljcm9zb2Z0LkRhdGFQcm94eS5Db3JlLkludGVyU2VydmljZURhdGFDb250cmFjdC5DcmVkZW50aWFsU1UwNkNZMTQifQ=="
+        },
+        "connectVia": {
+            "referenceName": "SelfHostedintegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+        }
+    }
+}
