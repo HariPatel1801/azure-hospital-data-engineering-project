@@ -1,0 +1,25 @@
+{
+    "name": "SqlServerTableSource",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "SqlServer",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "p_table_name": {
+                "type": "string"
+            }
+        },
+        "annotations": [],
+        "type": "SqlServerTable",
+        "schema": [],
+        "typeProperties": {
+            "schema": "dbo",
+            "table": {
+                "value": "@dataset().p_table_name",
+                "type": "Expression"
+            }
+        }
+    },
+    "type": "Microsoft.DataFactory/factories/datasets"
+}
