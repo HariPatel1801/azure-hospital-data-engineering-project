@@ -1,0 +1,364 @@
+{
+    "name": "SQL_to_bronze_pipeline",
+    "properties": {
+        "activities": [
+            {
+                "name": "ForEach",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Last_Load_Lookup",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@pipeline().parameters.tables",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Copy data_copy",
+                            "type": "Copy",
+                            "dependsOn": [
+                                {
+                                    "activity": "Latest_Load_Lookup_copy1",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "SqlServerSource",
+                                    "sqlReaderQuery": {
+                                        "value": "SELECT * FROM @{item()} where current_date > '@{activity('Last_Load_Lookup').output.firstRow.lastload}' AND current_date <= '@{activity('Latest_Load_Lookup_copy1').output.firstRow.latest_load}'",
+                                        "type": "Expression"
+                                    },
+                                    "queryTimeout": "02:00:00",
+                                    "partitionOption": "None"
+                                },
+                                "sink": {
+                                    "type": "DelimitedTextSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextWriteSettings",
+                                        "quoteAllText": true,
+                                        "fileExtension": ".txt"
+                                    }
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "SqlServerTableSource",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "p_table_name": {
+                                            "value": "@item()",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "RawData",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "p_table_name": {
+                                            "value": "@item()",
+                                            "type": "Expression"
+                                        },
+                                        "p_folder_path": {
+                                            "value": "@variables('folder_path')",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Latest_Load_Lookup_copy1",
+                            "type": "Lookup",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "SqlServerSource",
+                                    "sqlReaderQuery": {
+                                        "value": "SELECT MAX(current_date) AS latest_load FROM @{item()}",
+                                        "type": "Expression"
+                                    },
+                                    "queryTimeout": "02:00:00",
+                                    "isolationLevel": "RepeatableRead",
+                                    "partitionOption": "None"
+                                },
+                                "dataset": {
+                                    "referenceName": "SqlServerTableSource",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "p_table_name": {
+                                            "value": "@item()",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Watermark_copy1",
+                            "type": "Copy",
+                            "dependsOn": [
+                                {
+                                    "activity": "Copy data_copy",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "JsonSource",
+                                    "additionalColumns": [
+                                        {
+                                            "name": "lastload",
+                                            "value": {
+                                                "value": "@activity('Latest_Load_Lookup_copy1').output.firstRow.latest_load",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    ],
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSReadSettings",
+                                        "recursive": true,
+                                        "enablePartitionDiscovery": false
+                                    },
+                                    "formatSettings": {
+                                        "type": "JsonReadSettings"
+                                    }
+                                },
+                                "sink": {
+                                    "type": "JsonSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings"
+                                    },
+                                    "formatSettings": {
+                                        "type": "JsonWriteSettings"
+                                    }
+                                },
+                                "enableStaging": false
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "ds_dummy",
+                                    "type": "DatasetReference"
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "DS_LookUp",
+                                    "type": "DatasetReference"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "AuditLog_Insert",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Watermark_copy1",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_InsertAuditLog]",
+                                "storedProcedureParameters": {
+                                    "CopyDuration": {
+                                        "value": {
+                                            "value": "@activity('Copy data_copy').output.copyDuration",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int64"
+                                    },
+                                    "ErrorMessage": {
+                                        "value": "",
+                                        "type": "String"
+                                    },
+                                    "LoadDate": {
+                                        "value": {
+                                            "value": "@utcNow()",
+                                            "type": "Expression"
+                                        },
+                                        "type": "DateTime"
+                                    },
+                                    "PipelineName": {
+                                        "value": {
+                                            "value": "@pipeline().Pipeline",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    },
+                                    "RowsCopied": {
+                                        "value": {
+                                            "value": "@activity('Copy data_copy').output.rowsCopied",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int64"
+                                    },
+                                    "RowsRead": {
+                                        "value": {
+                                            "value": "@activity('Copy data_copy').output.rowsRead",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int64"
+                                    },
+                                    "SchemaName": {
+                                        "value": "dbo",
+                                        "type": "String"
+                                    },
+                                    "TableName": {
+                                        "value": {
+                                            "value": "@item()",
+                                            "type": "Expression"
+                                        },
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "SqlServer",
+                                "type": "LinkedServiceReference"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Last_Load_Lookup",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "Set_folderPath",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 2,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "JsonSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "JsonReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "DS_LookUp",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": true
+                }
+            },
+            {
+                "name": "Set_folderPath",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "folder_path",
+                    "value": {
+                        "value": "@concat(\nformatDateTime(utcNow(),'yyyy'),'/',\nformatDateTime(utcNow(),'MM'),'/',\nformatDateTime(utcNow(),'dd'),'/',\nformatDateTime(utcNow(),'HH'),'/',\nformatDateTime(utcNow(),'mm'))",
+                        "type": "Expression"
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "tables": {
+                "type": "array",
+                "defaultValue": [
+                    "Accounts",
+                    "Departments",
+                    "Encounters",
+                    "Hospitals",
+                    "OrdersProcedures"
+                ]
+            }
+        },
+        "variables": {
+            "v_now": {
+                "type": "String"
+            },
+            "folder_path": {
+                "type": "String"
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2026-06-22T21:44:03Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}
